@@ -14,6 +14,7 @@ public class Main {
      * The amount of request to store in memory before processing
      */
     public static final int BACKLOG = 10;
+    public static final int STOP_DELAY_SEC = 2;
 
     static void main() {
         try {
@@ -27,24 +28,24 @@ public class Main {
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
-                exchange.sendResponseHeaders(200, message.getBytes().length);
+                exchange.sendResponseHeaders(HttpStatus.OK, message.getBytes().length);
                 exchange.getResponseBody().write(message.getBytes());
                 exchange.close();
             };
 
             HttpHandler stopHandler = exchange -> {
                 String message = "Server Stopping";
-                exchange.sendResponseHeaders(200, message.getBytes().length);
+                exchange.sendResponseHeaders(HttpStatus.OK, message.getBytes().length);
                 exchange.getResponseBody().write(message.getBytes());
                 exchange.close();
                 // Find out how to delay closing this application and server
-                server.stop(2);
-                System.out.println("Server stopping");
+                server.stop(STOP_DELAY_SEC);
+                Logger.log("Server stopping");
             };
 
             HttpHandler mediaHandler = exchange -> {
                 String message = "Media Endpoint not implemented yet";
-                exchange.sendResponseHeaders(500, message.getBytes().length);
+                exchange.sendResponseHeaders(HttpStatus.INTERNAL_SERVER_ERROR, message.getBytes().length);
                 exchange.getResponseBody().write(message.getBytes());
                 exchange.close();
             };
@@ -59,7 +60,7 @@ public class Main {
             List<Filter> filters = getFilters();
             contexts.forEach(context -> context.getFilters().addAll(filters));
 
-            System.out.println("Server Started");
+            Logger.log("Server Started");
         } catch (IOException e) {
             System.exit(1);
         }
@@ -71,19 +72,19 @@ public class Main {
             @Override
             public void doFilter(HttpExchange exchange, Chain chain) throws IOException {
                 // work before request handling
-                System.out.println("Request URI: " + exchange.getRequestURI());
-                System.out.println("Request method: " + exchange.getRequestMethod());
-                System.out.println("Request body: " + exchange.getRequestBody());
-                System.out.println("Request headers: " + exchange.getRequestHeaders());
-//                System.out.println("Request protocol: " + exchange.getProtocol());
-//                System.out.println("Request local address: " + exchange.getLocalAddress());
-//                System.out.println("Request principal: " + exchange.getPrincipal());
-//                System.out.println("Request remote address: " + exchange.getRemoteAddress());
+                Logger.log("Request URI: " + exchange.getRequestURI());
+                Logger.log("Request method: " + exchange.getRequestMethod());
+                Logger.log("Request body: " + exchange.getRequestBody());
+                Logger.log("Request headers: " + exchange.getRequestHeaders());
+//                Logger.log("Request protocol: " + exchange.getProtocol());
+//                Logger.log("Request local address: " + exchange.getLocalAddress());
+//                Logger.log("Request principal: " + exchange.getPrincipal());
+//                Logger.log("Request remote address: " + exchange.getRemoteAddress());
                 // processing request filter chain
                 chain.doFilter(exchange);
                 // work after request handling
-                System.out.println("Processing request finished");
-                System.out.println("Request Response Code: " + exchange.getResponseCode());
+                Logger.log("Processing request finished");
+                Logger.log("Request Response Code: " + exchange.getResponseCode());
             }
 
             @Override
@@ -93,14 +94,14 @@ public class Main {
         };
 
         Filter beforeFilter = Filter.beforeHandler("Before Filter", (exchange) -> {
-//            System.out.println("Recording time for request");
+//            Logger.log("Recording time for request");
             exchange.setAttribute("time", System.currentTimeMillis());
         });
 
         Filter afterFilter = Filter.afterHandler("After Filter", (exchange) -> {
             long startTime = (long) exchange.getAttribute("time");
             long timeTaken = System.currentTimeMillis() - startTime;
-            System.out.println("Time taken: " + timeTaken + "ms");
+            Logger.log("Time taken: " + timeTaken + "ms");
         });
 
         return List.of(beforeFilter, afterFilter, logFilter);
