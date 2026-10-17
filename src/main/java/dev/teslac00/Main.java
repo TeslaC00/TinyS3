@@ -43,12 +43,7 @@ public class Main {
                 Logger.log("Server stopping");
             };
 
-            HttpHandler mediaHandler = exchange -> {
-                String message = "Media Endpoint not implemented yet";
-                exchange.sendResponseHeaders(HttpStatus.INTERNAL_SERVER_ERROR, message.getBytes().length);
-                exchange.getResponseBody().write(message.getBytes());
-                exchange.close();
-            };
+            HttpHandler mediaHandler = new MediaHandler();
 
             List<HttpContext> contexts = new ArrayList<>();
             HttpContext rootContext = server.createContext("/");

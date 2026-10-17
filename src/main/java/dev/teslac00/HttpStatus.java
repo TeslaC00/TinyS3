@@ -17,7 +17,7 @@ public final class HttpStatus {
     public static final int GONE = 410;
     public static final int LENGTH_REQUIRED = 411;
     public static final int PRECONDITION_FAILED = 412;
-    public static final int REQUEST_ENTITY_TOO_LARGE = 413;
+    public static final int CONTENT_TOO_LARGE = 413;
     public static final int REQUEST_URI_TOO_LONG = 414;
     public static final int UNSUPPORTED_MEDIA_TYPE = 415;
     public static final int REQUESTED_RANGE_NOT_SATISFIABLE = 416;
