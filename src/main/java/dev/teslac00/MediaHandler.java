@@ -6,12 +6,18 @@ import com.sun.net.httpserver.HttpHandler;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MediaHandler implements HttpHandler {
+
+    final static int CR = 13; // (D) /r -> carriage return
+    final static int LF = 10; // (A) /n -> carriage return
+    final static String CONTENT_TYPE_TEXT = "text/plain";
+    final static String CONTENT_TYPE_JSON = "application/json";
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
@@ -81,8 +87,6 @@ public class MediaHandler implements HttpHandler {
         // trim field which is surrounded by CRLF
         // trim field headers-data by CRLF 2 times
         // ends with --CRLF
-        final int CR = 13; // (D) /r -> carriage return
-        final int LF = 10; // (A) /n -> carriage return
         final int DASH = 45; // - -> minus or dash
         final byte[] TRAIL_BYTES = new byte[]{DASH, DASH, CR, LF};
         List<byte[]> splitBytes = splitBytes(rawBodyBytes, boundaryBytes);
@@ -106,7 +110,36 @@ public class MediaHandler implements HttpHandler {
         List<byte[]> fieldBytesList = splitBytes(fieldTrimmedBytes, FIELD_SPLIT_BYTES);
         Logger.debug("Multipart field length size: ", fieldBytesList.size());
 
-        String fileName = LocalDate.now() + ".jpg";
+        // field headers
+        // Content-Disposition: form-data; name="image"; filename="rat.jpg"
+        // Content-Type: image/jpeg
+        // Each field header field separated by CRLF (Content-Disposition-CRLF-Content-Type)
+        String fieldHeaders = new String(fieldBytesList.getFirst(), StandardCharsets.UTF_8);
+        Logger.trace("Field headers: [", fieldHeaders, "]");
+
+        // Could extract Content-Type using split then default it and use smaller pattern for different field header
+        // Not sure if we get different Header inplace of Content-Type
+        Pattern fieldHeaderPattern = Pattern.compile(
+                "Content-Disposition:\\s([^;]*);\\sname=\"([^\"]*)\";\\sfilename=\"([^\"]*)\"(?:\\r\\nContent-Type:\\s(.*))?"
+        );
+
+        Matcher fieldHeaderMatcher = fieldHeaderPattern.matcher(fieldHeaders);
+        boolean matches = fieldHeaderMatcher.matches();
+        if (!matches) {
+            return ResponseData.badRequest("Invalid field headers");
+        }
+
+        String fileName = fieldHeaderMatcher.group(3);
+        String fieldDataType = fieldHeaderMatcher.group(4);
+        if (fieldDataType == null) {
+            fieldDataType = CONTENT_TYPE_TEXT;
+        }
+
+        Logger.debug("Content-Disposition: [", fieldHeaderMatcher.group(1), "]");
+        Logger.debug("name: [", fieldHeaderMatcher.group(2), "]");
+        Logger.debug("filename: [", fileName, "]");
+        Logger.debug("Content-Type: [", fieldDataType, "]");
+
         File saveFile = new File(fileName);
 
         try (FileOutputStream fos = new FileOutputStream(saveFile)) {
@@ -121,6 +154,16 @@ public class MediaHandler implements HttpHandler {
 
         Logger.info("Saved the file to disk: ", fileName);
         return ResponseData.ok("Saved the file SUCCESSFULLY!");
+    }
+
+    private void byteDebug(byte[] bytes) {
+        System.out.print("{");
+        for (byte b : bytes) {
+            if (b == CR) System.out.print("CR ");
+            else if (b == LF) System.out.print("LF ");
+            else System.out.printf("%d ", b);
+        }
+        System.out.print("}");
     }
 
     private int indexOf(byte[] bytes, byte[] delimiter, int offset) {

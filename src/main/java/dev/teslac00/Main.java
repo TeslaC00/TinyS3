@@ -18,10 +18,13 @@ public class Main {
 
 
     static void main() {
-        Logger.level = Logger.LEVEL.INFO;
+        Logger.level = Logger.LEVEL.DEBUG;
         Logger.info("TinyS3 Starting at: ", PORT);
+
+        HttpServer server;
+
         try {
-            HttpServer server = HttpServer.create(new InetSocketAddress(PORT), BACKLOG);
+            server = HttpServer.create(new InetSocketAddress(PORT), BACKLOG);
             server.start();
 
             HttpHandler rootHandler = exchange -> {
