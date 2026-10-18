@@ -18,6 +18,8 @@ public class MediaHandler implements HttpHandler {
     final static int LF = 10; // (A) /n -> carriage return
     final static String CONTENT_TYPE_TEXT = "text/plain";
     final static String CONTENT_TYPE_JSON = "application/json";
+    final static String CONTENT_MULTIPART_FORM_DATA = "multipart/form-data";
+    final static String CONTENT_APPLICATION_OCTET_STREAM = "application/octet-stream";
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
@@ -140,10 +142,8 @@ public class MediaHandler implements HttpHandler {
         Logger.debug("filename: [", fileName, "]");
         Logger.debug("Content-Type: [", fieldDataType, "]");
 
-        File saveFile = new File(fileName);
-
-        try (FileOutputStream fos = new FileOutputStream(saveFile)) {
-            fos.write(fieldBytesList.getLast());
+        try {
+            Storage.store(fileName, fieldBytesList.getLast());
         } catch (FileNotFoundException fe) {
             Logger.error("File cannot be created/open with name: ", fileName, fe.getMessage());
             return ResponseData.fromString(HttpStatus.INTERNAL_SERVER_ERROR, "Filename conflicts, Failed to save file");
