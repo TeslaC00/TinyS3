@@ -28,7 +28,7 @@ public class MediaHandler implements HttpHandler {
         ResponseData responseData;
 
         if ("GET".equalsIgnoreCase(method)) {
-            responseData = ResponseData.ok("Media Endpoint LIVE");
+            responseData = get(exchange);
         } else if ("POST".equalsIgnoreCase(method)) {
             responseData = post(exchange);
         } else {
@@ -38,6 +38,12 @@ public class MediaHandler implements HttpHandler {
         exchange.sendResponseHeaders(responseData.statusCode(), responseData.responseBytes().length);
         exchange.getResponseBody().write(responseData.responseBytes());
         exchange.close();
+    }
+
+    private ResponseData get(HttpExchange exchange) {
+        List<String> keys = Storage.getKeys();
+        exchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_TEXT);
+        return ResponseData.ok(Arrays.toString(keys.toArray()));
     }
 
     private ResponseData post(HttpExchange exchange) {
