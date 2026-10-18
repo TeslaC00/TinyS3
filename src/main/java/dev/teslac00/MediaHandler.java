@@ -40,14 +40,14 @@ public class MediaHandler implements HttpHandler {
         } catch (NumberFormatException e) {
             return ResponseData.fromString(HttpStatus.LENGTH_REQUIRED, "Wrong or Negative Content-Length");
         }
-        Logger.log("Content-Length: ", contentLength);
+        Logger.debug("Content-Length: ", contentLength);
 
         String contentType = requestHeaders.getFirst("Content-Type");
         if (contentType == null || !contentType.startsWith("multipart/form-data")) {
             return ResponseData.badRequest("Wrong Content-Type use 'multipart/form-data'");
         }
 
-        Logger.log("Content-Type: ", contentType);
+        Logger.debug("Content-Type: ", contentType);
 
         // multipart/form-data; boundary=PieBoundary123456789012345678901234567
         String boundary;
@@ -57,14 +57,14 @@ public class MediaHandler implements HttpHandler {
             return ResponseData.badRequest("Missing multipart boundary");
         }
 
-        Logger.log("Boundary: ", boundary);
+        Logger.debug("Boundary: ", boundary);
 
         InputStream requestBody = exchange.getRequestBody();
         if (requestBody == null) {
             return ResponseData.badRequest("Missing request body");
         }
 
-        Logger.log("Request Body: ", requestBody);
+        Logger.debug("Request Body: ", requestBody);
         byte[] rawBodyBytes;
         try {
             rawBodyBytes = requestBody.readNBytes(contentLength);
@@ -74,7 +74,7 @@ public class MediaHandler implements HttpHandler {
             return ResponseData.badRequest("Failed to read  the post method ending");
         }
 
-        Logger.log("Raw body size: ", rawBodyBytes.length);
+        Logger.debug("Raw body size: ", rawBodyBytes.length);
 
         // split by --boundary
         byte[] boundaryBytes = ("--" + boundary).getBytes(StandardCharsets.UTF_8);
@@ -86,10 +86,10 @@ public class MediaHandler implements HttpHandler {
         final int DASH = 45; // - -> minus or dash
         final byte[] TRAIL_BYTES = new byte[]{DASH, DASH, CR, LF};
         List<byte[]> splitBytes = splitBytes(rawBodyBytes, boundaryBytes);
-//            Logger.log("SplitBytes length: ", splitBytes.size());
+//            Logger.debug("SplitBytes length: ", splitBytes.size());
 //            for (byte[] b : splitBytes) {
-//                Logger.log("Next split length: ", b.length);
-//                Logger.log("As String: [", new String(b, StandardCharsets.UTF_8), "]");
+//                Logger.debug("Next split length: ", b.length);
+//                Logger.debug("As String: [", new String(b, StandardCharsets.UTF_8), "]");
 //            }
         boolean ending = Arrays.equals(TRAIL_BYTES, splitBytes.getLast());
         if (!ending) {
@@ -104,7 +104,7 @@ public class MediaHandler implements HttpHandler {
 
         // trim field headers-data by CRLF 2 times
         List<byte[]> fieldBytesList = splitBytes(fieldTrimmedBytes, FIELD_SPLIT_BYTES);
-        Logger.log("Multipart field length size: ", fieldBytesList.size());
+        Logger.debug("Multipart field length size: ", fieldBytesList.size());
 
         String fileName = LocalDate.now() + ".jpg";
         File saveFile = new File(fileName);
@@ -112,14 +112,14 @@ public class MediaHandler implements HttpHandler {
         try (FileOutputStream fos = new FileOutputStream(saveFile)) {
             fos.write(fieldBytesList.getLast());
         } catch (FileNotFoundException fe) {
-            Logger.log("File cannot be created/open with name: ", fileName, fe.getMessage());
+            Logger.error("File cannot be created/open with name: ", fileName, fe.getMessage());
             return ResponseData.fromString(HttpStatus.INTERNAL_SERVER_ERROR, "Filename conflicts, Failed to save file");
         } catch (IOException e) {
-            Logger.log("Cannot write data in file: ", fileName, e.getMessage());
+            Logger.error("Cannot write data in file: ", fileName, e.getMessage());
             return ResponseData.fromString(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to save file");
         }
 
-        Logger.log("Saved the file to disk: ", fileName);
+        Logger.info("Saved the file to disk: ", fileName);
         return ResponseData.ok("Saved the file SUCCESSFULLY!");
     }
 

@@ -16,18 +16,21 @@ public class Main {
     public static final int BACKLOG = 10;
     public static final int STOP_DELAY_SEC = 2;
 
+
     static void main() {
+        Logger.level = Logger.LEVEL.INFO;
+        Logger.info("TinyS3 Starting at: ", PORT);
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress(PORT), BACKLOG);
             server.start();
 
             HttpHandler rootHandler = exchange -> {
-                String message = "TinyS3 is Live";
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
+                String message = "TinyS3 is Live";
                 exchange.sendResponseHeaders(HttpStatus.OK, message.getBytes().length);
                 exchange.getResponseBody().write(message.getBytes());
                 exchange.close();
@@ -40,7 +43,7 @@ public class Main {
                 exchange.close();
                 // Find out how to delay closing this application and server
                 server.stop(STOP_DELAY_SEC);
-                Logger.log("Server stopping");
+                Logger.info(message);
             };
 
             HttpHandler mediaHandler = new MediaHandler();
@@ -55,7 +58,7 @@ public class Main {
             List<Filter> filters = getFilters();
             contexts.forEach(context -> context.getFilters().addAll(filters));
 
-            Logger.log("Server Started");
+            Logger.info("Server Started");
         } catch (IOException e) {
             System.exit(1);
         }
@@ -67,19 +70,19 @@ public class Main {
             @Override
             public void doFilter(HttpExchange exchange, Chain chain) throws IOException {
                 // work before request handling
-                Logger.log("Request URI: " + exchange.getRequestURI());
-                Logger.log("Request method: " + exchange.getRequestMethod());
-                Logger.log("Request body: " + exchange.getRequestBody());
-                Logger.log("Request headers: " + exchange.getRequestHeaders());
-//                Logger.log("Request protocol: " + exchange.getProtocol());
-//                Logger.log("Request local address: " + exchange.getLocalAddress());
-//                Logger.log("Request principal: " + exchange.getPrincipal());
-//                Logger.log("Request remote address: " + exchange.getRemoteAddress());
+                Logger.debug("Request URI: ", exchange.getRequestURI());
+                Logger.debug("Request method: ", exchange.getRequestMethod());
+                Logger.debug("Request body: ", exchange.getRequestBody());
+                Logger.debug("Request headers: ", exchange.getRequestHeaders());
+                Logger.debug("Request protocol: ", exchange.getProtocol());
+                Logger.debug("Request local address: ", exchange.getLocalAddress());
+                Logger.debug("Request principal: ", exchange.getPrincipal());
+                Logger.debug("Request remote address: ", exchange.getRemoteAddress());
                 // processing request filter chain
                 chain.doFilter(exchange);
                 // work after request handling
-                Logger.log("Processing request finished");
-                Logger.log("Request Response Code: " + exchange.getResponseCode());
+                Logger.debug("Processing request finished");
+                Logger.debug("Request Response Code: ", exchange.getResponseCode());
             }
 
             @Override
@@ -89,14 +92,14 @@ public class Main {
         };
 
         Filter beforeFilter = Filter.beforeHandler("Before Filter", (exchange) -> {
-//            Logger.log("Recording time for request");
+            Logger.trace("Recording time for request");
             exchange.setAttribute("time", System.currentTimeMillis());
         });
 
         Filter afterFilter = Filter.afterHandler("After Filter", (exchange) -> {
             long startTime = (long) exchange.getAttribute("time");
             long timeTaken = System.currentTimeMillis() - startTime;
-            Logger.log("Time taken: " + timeTaken + "ms");
+            Logger.info("Time taken: ", timeTaken, "ms");
         });
 
         return List.of(beforeFilter, afterFilter, logFilter);
