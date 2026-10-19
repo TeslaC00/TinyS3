@@ -33,6 +33,27 @@ public class Storage {
         return keys;
     }
 
+    public static File getFile(String fileName) {
+        File rootFolder = new File(DIRECTORY);
+        if (!rootFolder.exists()) {
+            if (!rootFolder.mkdir()) {
+                Logger.warn("Cannot create directory: ", DIRECTORY);
+                return null;
+            }
+        }
+
+        File[] files = rootFolder.listFiles();
+        if (files == null) return null;
+
+        for (File file : files) {
+            if (fileName.equals(file.getName())) {
+                return file;
+            }
+        }
+
+        return null;
+    }
+
     public static void store(String fileName, byte[] data) throws IOException {
         File rootFolder = new File(DIRECTORY);
         if (!rootFolder.exists()) {

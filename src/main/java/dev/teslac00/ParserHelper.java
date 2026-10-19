@@ -35,7 +35,14 @@ public class ParserHelper {
                 fileName,
                 fieldDataType
         );
+    }
 
+    public static String parseFilenameURI(String uri) {
+        // [/media/Blank.txt]
+        Pattern fileNameUriPattern = Pattern.compile("/media(?:/([^/]*))?");
+        Matcher matcher = fileNameUriPattern.matcher(uri);
+        if (matcher.matches()) return matcher.group(1);
+        return null;
     }
 
 }

@@ -4,9 +4,7 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -34,15 +32,46 @@ public class MediaHandler implements HttpHandler {
             responseData = ResponseData.badRequest("Unsupported Method, use 'GET', 'POST'");
         }
 
-        exchange.sendResponseHeaders(responseData.statusCode(), responseData.responseBytes().length);
-        exchange.getResponseBody().write(responseData.responseBytes());
+        if (responseData.responseBytes() != null) {
+            exchange.sendResponseHeaders(responseData.statusCode(), responseData.responseBytes().length);
+            exchange.getResponseBody().write(responseData.responseBytes());
+        } else {
+            exchange.sendResponseHeaders(responseData.statusCode(), -1);
+        }
+
         exchange.close();
     }
 
     private ResponseData get(HttpExchange exchange) {
+        String requestURI = exchange.getRequestURI().toString();
+        String filename = ParserHelper.parseFilenameURI(requestURI);
+        if (filename == null) return getAll(exchange);
+        else return getByFilename(exchange, filename);
+    }
+
+    public ResponseData getAll(HttpExchange exchange) {
         List<String> keys = Storage.getKeys();
         exchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_TEXT);
         return ResponseData.ok(Arrays.toString(keys.toArray()));
+    }
+
+    public ResponseData getByFilename(HttpExchange exchange, String filename) {
+        File file = Storage.getFile(filename);
+
+        if (file == null)
+            return new ResponseData(HttpStatus.NOT_FOUND, null);
+
+        try (FileInputStream stream = new FileInputStream(file)) {
+            exchange.getResponseHeaders().add("Content-Type", CONTENT_APPLICATION_OCTET_STREAM);
+            exchange.getResponseHeaders().add("FileName", filename);
+            return new ResponseData(HttpStatus.OK, stream.readAllBytes());
+        } catch (FileNotFoundException e) {
+            return new ResponseData(HttpStatus.NOT_FOUND, null);
+        } catch (IOException e) {
+            Logger.warn("Failed to open file ", filename, ": ", e.getMessage());
+            String message = "Failed to send file: " + filename;
+            return new ResponseData(HttpStatus.INTERNAL_SERVER_ERROR, message.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     private ResponseData post(HttpExchange exchange) {
