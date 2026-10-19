@@ -4,13 +4,12 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
-import java.io.*;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class MediaHandler implements HttpHandler {
 
@@ -97,7 +96,7 @@ public class MediaHandler implements HttpHandler {
         // ends with --CRLF
         final int DASH = 45; // - -> minus or dash
         final byte[] TRAIL_BYTES = new byte[]{DASH, DASH, CR, LF};
-        List<byte[]> splitBytes = splitBytes(rawBodyBytes, boundaryBytes);
+        List<byte[]> splitBytes = ByteHelper.splitBytes(rawBodyBytes, boundaryBytes);
 //            Logger.debug("SplitBytes length: ", splitBytes.size());
 //            for (byte[] b : splitBytes) {
 //                Logger.debug("Next split length: ", b.length);
@@ -115,7 +114,7 @@ public class MediaHandler implements HttpHandler {
         System.arraycopy(fieldRawBytes, 2, fieldTrimmedBytes, 0, fieldTrimmedBytes.length);
 
         // trim field headers-data by CRLF 2 times
-        List<byte[]> fieldBytesList = splitBytes(fieldTrimmedBytes, FIELD_SPLIT_BYTES);
+        List<byte[]> fieldBytesList = ByteHelper.splitBytes(fieldTrimmedBytes, FIELD_SPLIT_BYTES);
         Logger.debug("Multipart field length size: ", fieldBytesList.size());
 
         // field headers
@@ -127,26 +126,9 @@ public class MediaHandler implements HttpHandler {
 
         // Could extract Content-Type using split then default it and use smaller pattern for different field header
         // Not sure if we get different Header inplace of Content-Type
-        Pattern fieldHeaderPattern = Pattern.compile(
-                "Content-Disposition:\\s([^;]*);\\sname=\"([^\"]*)\";\\sfilename=\"([^\"]*)\"(?:\\r\\nContent-Type:\\s(.*))?"
-        );
-
-        Matcher fieldHeaderMatcher = fieldHeaderPattern.matcher(fieldHeaders);
-        boolean matches = fieldHeaderMatcher.matches();
-        if (!matches) {
-            return ResponseData.badRequest("Invalid field headers");
-        }
-
-        String fileName = fieldHeaderMatcher.group(3);
-        String fieldDataType = fieldHeaderMatcher.group(4);
-        if (fieldDataType == null) {
-            fieldDataType = CONTENT_TYPE_TEXT;
-        }
-
-        Logger.debug("Content-Disposition: [", fieldHeaderMatcher.group(1), "]");
-        Logger.debug("name: [", fieldHeaderMatcher.group(2), "]");
-        Logger.debug("filename: [", fileName, "]");
-        Logger.debug("Content-Type: [", fieldDataType, "]");
+        MultipartFieldHeader fieldHeader = ParserHelper.parseFieldHeader(fieldHeaders);
+        if (fieldHeader == null) return ResponseData.badRequest("Invalid field header");
+        String fileName = fieldHeader.filename();
 
         try {
             Storage.store(fileName, fieldBytesList.getLast());
@@ -160,55 +142,5 @@ public class MediaHandler implements HttpHandler {
 
         Logger.info("Saved the file to disk: ", fileName);
         return ResponseData.ok("Saved the file SUCCESSFULLY!");
-    }
-
-    private void byteDebug(byte[] bytes) {
-        System.out.print("{");
-        for (byte b : bytes) {
-            if (b == CR) System.out.print("CR ");
-            else if (b == LF) System.out.print("LF ");
-            else System.out.printf("%d ", b);
-        }
-        System.out.print("}");
-    }
-
-    private int indexOf(byte[] bytes, byte[] delimiter, int offset) {
-        for (int i = offset; i < bytes.length - delimiter.length; i++) {
-            int start = i;
-            for (byte b : delimiter) {
-                if (bytes[start++] != b) break;
-            }
-            if (start == i + delimiter.length) return i;
-        }
-
-        return -1;
-    }
-
-    private List<byte[]> splitBytes(byte[] bytes, byte[] delimiter) {
-        List<byte[]> list = new ArrayList<>();
-        int lastIndexEnd = 0;
-        int index = indexOf(bytes, delimiter, lastIndexEnd);
-
-        while (index >= 0) {
-            int length = index - lastIndexEnd;
-            if (length > 0) {
-                byte[] array = new byte[length];
-                System.arraycopy(bytes, lastIndexEnd, array, 0, length);
-                list.add(array);
-            }
-
-            lastIndexEnd = index + delimiter.length;
-            index = indexOf(bytes, delimiter, lastIndexEnd);
-        }
-
-        // add last left-over data
-        if (lastIndexEnd < bytes.length) {
-            int length = bytes.length - lastIndexEnd;
-            byte[] array = new byte[length];
-            System.arraycopy(bytes, lastIndexEnd, array, 0, length);
-            list.add(array);
-        }
-
-        return list;
     }
 }
