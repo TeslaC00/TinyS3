@@ -21,50 +21,56 @@ public class Main {
         Logger.level = Logger.LEVEL.DEBUG;
         Logger.info("TinyS3 Starting at: ", PORT);
 
-        HttpServer server;
+        HttpServer server = null;
 
         try {
             server = HttpServer.create(new InetSocketAddress(PORT), BACKLOG);
             server.start();
-
-            HttpHandler rootHandler = exchange -> {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                String message = "TinyS3 is Live";
-                exchange.sendResponseHeaders(HttpStatus.OK, message.getBytes().length);
-                exchange.getResponseBody().write(message.getBytes());
-                exchange.close();
-            };
-
-            HttpHandler stopHandler = exchange -> {
-                String message = "Server Stopping";
-                exchange.sendResponseHeaders(HttpStatus.OK, message.getBytes().length);
-                exchange.getResponseBody().write(message.getBytes());
-                exchange.close();
-                // Find out how to delay closing this application and server
-                server.stop(STOP_DELAY_SEC);
-                Logger.info(message);
-            };
-
-            HttpHandler mediaHandler = new MediaHandler();
-
-            List<HttpContext> contexts = new ArrayList<>();
-            HttpContext rootContext = server.createContext("/");
-            rootContext.setHandler(rootHandler);
-            contexts.add(rootContext);
-            contexts.add(server.createContext("/exit", stopHandler));
-            contexts.add(server.createContext("/media", mediaHandler));
-
-            List<Filter> filters = getFilters();
-            contexts.forEach(context -> context.getFilters().addAll(filters));
-
-            Logger.info("Server Started");
         } catch (IOException e) {
             System.exit(1);
         }
+
+        List<HttpContext> contexts = new ArrayList<>();
+        HttpContext rootContext = server.createContext("/");
+        rootContext.setHandler(rootHandler());
+        contexts.add(rootContext);
+        contexts.add(server.createContext("/exit", stopHandler()));
+        contexts.add(server.createContext("/media", new MediaHandler()));
+
+        List<Filter> filters = getFilters();
+        contexts.forEach(context -> context.getFilters().addAll(filters));
+
+        Logger.info("Server Started");
+    }
+
+    private static HttpHandler rootHandler() {
+        return exchange -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Logger.warn("Interrupted while sleeping in root handler");
+            }
+            String message = "TinyS3 is Live";
+            exchange.sendResponseHeaders(HttpStatus.OK, message.getBytes().length);
+            exchange.getResponseBody().write(message.getBytes());
+            exchange.close();
+        };
+    }
+
+    private static HttpHandler stopHandler() {
+        return exchange -> {
+            String message = "Server Stopping";
+            exchange.sendResponseHeaders(HttpStatus.OK, message.getBytes().length);
+            exchange.getResponseBody().write(message.getBytes());
+            exchange.close();
+            // Find out how to delay closing this application and server
+            Logger.info(message);
+            try {
+                exchange.getHttpContext().getServer().stop(STOP_DELAY_SEC);
+            } catch (IllegalArgumentException e) {
+                Logger.error("Server failed to stop wrong delay value", e.getMessage()); // Error ? WARN
+            }
+        };
     }
 
     private static List<Filter> getFilters() {
